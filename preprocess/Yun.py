@@ -78,7 +78,7 @@ class Yun():
         print count
         #print self.yun_map
         #fout = open("result/yuncount.txt", "w")
-        self.totalpoemlist()
+        self.totalpoemlist() #这个函数在哪？？？
         for word in self.yun_map:
             max_times = -1
             max_yun = ""

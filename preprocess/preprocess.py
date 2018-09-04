@@ -36,7 +36,7 @@ class Preporcess(object):
 
         # 0: ping, 1:ze, 2: ping or ze
         self.SENGL = {7: ["2120011", "2021100", "2100110", "2021001"],
-                      5: ["20011", "21100", "00110", "21001"]}
+                      5: ["20011", "21100", "00110", "21001"]} #四种句式：仄仄脚，平平脚，仄平脚，平仄脚
         self.pingList = [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23, 25, 27]
 
         # Load data sets
@@ -96,17 +96,17 @@ class Preporcess(object):
             yun = int(self.yuntool.getYun(sens[i])[0])
             yuns.append(yun)
 
-
+        #绝句是二四句押韵，二四一定是平声
         if yuns[1] == -1 and yuns[3] != -1:
             yuns[1] = yuns[3]
         elif yuns[1] != -1 and yuns[3] == -1:
             yuns[3] = yuns[1]
         elif yuns[1] == -1 and yuns[3] == -1:
             return []
-
+        #一三句
         if yuns[0] not in self.pingList:
             yuns[0] = 35
-        yuns[2] = 35 #写错了？？
+        yuns[2] = 35 #五言绝句，七言绝句 的第三句 最后一个字一定是仄声
 
         yunstr = [str(y) for y in yuns]
         return yunstr
