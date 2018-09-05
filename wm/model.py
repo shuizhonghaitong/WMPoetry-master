@@ -47,7 +47,7 @@ class PoemModel(object):
                 random.shuffle(init_val)
             bias_val.append(np.array(init_val+[0.0]))
         bias_val = np.array(bias_val)
-        print ("Shape of random bias: %s" % (str(np.shape(bias_val))))
+        print ("Shape of random bias: %s" % (str(np.shape(bias_val)))) #[b_size,his_mem_slots+1]
         self.random_bias = tf.constant(bias_val, dtype=tf.float32)
 
         # The null slot
