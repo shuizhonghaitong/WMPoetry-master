@@ -68,9 +68,9 @@ class PoemModel(object):
             word_emb = tf.get_variable('word_emb', [self.hps.vocab_size, self.hps.emb_size],
                 dtype=tf.float32, initializer=initializer, trainable= True)
 
-        self.emb_enc_inps = [ [tf.nn.embedding_lookup(word_emb, x) for x in enc_inp] for enc_inp in self.enc_inps]
-        self.emb_dec_inps = [ [tf.nn.embedding_lookup(word_emb, x) for x in dec_inp] for dec_inp in self.dec_inps]
-        self.emb_key_inps = [ [tf.nn.embedding_lookup(word_emb, x) for x in self.key_inps[i] ] 
+        self.emb_enc_inps = [ [tf.nn.embedding_lookup(word_emb, x) for x in enc_inp] for enc_inp in self.enc_inps] #[None,emb_size]
+        self.emb_dec_inps = [ [tf.nn.embedding_lookup(word_emb, x) for x in dec_inp] for dec_inp in self.dec_inps] #[None,emb_size]
+        self.emb_key_inps = [ [tf.nn.embedding_lookup(word_emb, x) for x in self.key_inps[i] ]  #[None,emb_size]
             for i in xrange(0, self.hps.key_slots)]
 
         # Build genre embedding
@@ -78,12 +78,12 @@ class PoemModel(object):
             # NOTE: we set fixed 36 phonology categories
             ph_emb = tf.get_variable('ph_emb', [36, self.hps.ph_emb_size], dtype=tf.float32,
                 initializer=tf.truncated_normal_initializer(stddev=1e-4))
-        emb_ph_inps = [ [tf.nn.embedding_lookup(ph_emb, x) for x in ph_inp] for ph_inp in self.ph_inps]
+        emb_ph_inps = [ [tf.nn.embedding_lookup(ph_emb, x) for x in ph_inp] for ph_inp in self.ph_inps] #[None,ph_emb_size]
 
         with tf.variable_scope('len_embedding'), tf.device('/cpu:0'):
             len_emb = tf.get_variable('len_emb', [self.dec_len+1, self.hps.len_emb_size], dtype=tf.float32,
                 initializer=tf.truncated_normal_initializer(stddev=1e-4))
-        emb_len_inps = [ [tf.nn.embedding_lookup(len_emb, x) for x in len_inp] for len_inp in self.len_inps]
+        emb_len_inps = [ [tf.nn.embedding_lookup(len_emb, x) for x in len_inp] for len_inp in self.len_inps] #[None,len_emb_size]
 
         # Concatenate phonology embedding and length embedding to form the genre embedding
         self.emb_genre = [[] for x in xrange(self.hps.sens_num)]
@@ -255,7 +255,7 @@ class PoemModel(object):
         his_mem, his_mem_mask, topic_trace, step):
         enc_state, attn_states, enc_outs = self.__build_encoder(step)
         if not (key_initial_state is None):
-            initial_state = key_initial_state
+            initial_state = key_initial_state #[batch_size,hidden_size]
         else:
             initial_state = enc_state
 
@@ -295,7 +295,7 @@ class PoemModel(object):
             key_states = array_ops.concat(key_states, 1) #返回tensor [-1,key_slots,self.enc_cell_fw.output_size*2]
             key_states = tf.multiply(self.key_mask, key_states) #element-wise,支持广播
 
-            final_state = math_ops.reduce_mean(key_states, axis=1) #tensor [-1,1,self.enc_cell_fw.output_size*2]
+            final_state = math_ops.reduce_mean(key_states, axis=1) #tensor [-1,self.enc_cell_fw.output_size*2]
             final_state = linear(final_state, self.hps.hidden_size, True,  scope="key_initial") #[batch_size,hidden_size]
             final_state = tf.tanh(final_state)
 
@@ -315,7 +315,7 @@ class PoemModel(object):
             final_state = tf.tanh(final_state)
 
             top_states = [array_ops.reshape(e, [-1, 1, self.enc_cell_fw.output_size*2]) for e in enc_outs]
-            attention_states = array_ops.concat(top_states, 1) #[batch_size,time,self.enc_cell_fw.output_size*2]
+            attention_states = array_ops.concat(top_states, 1) #[batch_size,enc_len,self.enc_cell_fw.output_size*2]
 
             final_attn_states = tf.multiply(self.enc_mask[step], attention_states) #enc_mask的shape是[batch_size,self.enc_len,1]
 
@@ -339,11 +339,12 @@ class PoemModel(object):
             # build attn_mask
             imask = 1.0 - total_mask
             attn_mask = tf.where(tf.equal(imask, 1), tf.ones_like(imask) * (-float('inf')), imask) #float('inf') 正无穷
+            #true的地方不变，false的地方变成后面的
 
             calcu_attention = lambda query : self.__attention_calcu(total_attn_states, query, attn_mask, "calcu_attention")
 
             state = initial_state
-            decoder_input_size = initial_state.get_shape()[1].value
+            decoder_input_size = initial_state.get_shape()[1].value #hidden_size
             for i, inp in enumerate(dec_inps): #某个句子的第几个字
                 if i > 0:
                     variable_scope.get_variable_scope().reuse_variables()
@@ -419,7 +420,7 @@ class PoemModel(object):
                 y = array_ops.reshape(y, [-1, 1, 1, mem_size])
                 s = math_ops.reduce_sum(v * math_ops.tanh(mem_features + y), [2, 3])  #[batch_size,mem_slots+1]
                 random_mask = 1.0 - tf.sign(math_ops.reduce_sum(tf.abs(tmp_mem), axis=2)) #[batch_size,his_mem_slots+1]
-
+                    #tf.sign(x) 若x==0，返回0；若x<0，返回-1；若x>0，返回1
                 # The random_mask shows if a slot is empty, 1 empty, 0 not empty.
                 # The null mask is 1 if there is at least 1 empty slot.
                 null_mask = random_mask[:, 0:self.hps.his_mem_slots]
@@ -454,7 +455,7 @@ class PoemModel(object):
                 float_mask = tf.expand_dims(float_mask, axis=2) #[batch_size,his_mem_slots+1,1]
                 #print (np.shape(float_mask))
 
-                w_states = tf.tile(mstate, [1, mem_slots]) #[batch,cell_fw.output_size + cell_bw.output_size] 变为[batch,mem_slots*(cell_fw.output_size + cell_bw.output_size)]
+                w_states = tf.tile(mstate, [1, mem_slots]) #[batch_size,2*hidden_size] 变为[batch_size,mem_slots*2*hidden_size]
                 w_states = array_ops.reshape(w_states, [-1, mem_slots, mem_size])
                 
                 final_mask = float_mask[:, 0:self.hps.his_mem_slots, :] #[batch_size,his_mem_slots,1]
@@ -466,7 +467,7 @@ class PoemModel(object):
     def __topic_trace_update(self, topic_trace, key_align, key_states): #topic_trace [batch_size,topic_trace_size+key_slots] key_align [batch_size,key_slots] key_states [batch_size,key_slots,hidden_size*2]
         with variable_scope.variable_scope("topic_trace_update"):
             key_used = math_ops.reduce_mean(tf.multiply(key_states, 
-                tf.expand_dims(key_align, axis=2)), axis=1) #[batch_size,hidden_size*2]
+                tf.expand_dims(key_align, axis=2)), axis=1) #[batch_size,key_slots,1] => [batch_size,key_slots,2*hidden_size] => [batch_size,2*hidden_size]
             new_topic_trace = linear([topic_trace[:, 0:self.hps.topic_trace_size], key_used], 
                 self.hps.topic_trace_size, True)
             new_topic_trace = tf.tanh(new_topic_trace) #[batch_size,topic_trace_size]
