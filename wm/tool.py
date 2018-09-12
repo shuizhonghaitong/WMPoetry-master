@@ -124,7 +124,7 @@ class PoetryTool(object):
         return train_batch_num, \
             valid_batch_num, train_batches, valid_batches
 
-    def build_batches(self, data, batch_size):
+    def build_batches(self, data, batch_size): #data 长度为num_samples的list，每个元素是(keyvec, sensvec, glvec)的三元组，keyvec是长度为keywords个数的list，每个元素是list；sensvec是长度为sens_num的list，每个元素是list；glvec是长度为sens_num的list，每个元素是list
         batched_data = []
         batch_num = int(np.ceil(len(data) / float(batch_size)))  
         for bi in range(0, batch_num):
@@ -138,16 +138,16 @@ class PoetryTool(object):
             all_enc_mask, all_write_mask = [], []
             all_len_inps, all_ph_inps = [], []
 
-            poems = [instance[1] for instance in instances] # All poems
-            genre_patterns = [instance[2] for instance in instances]
-            for i in xrange(-1, self.__sens_num-1):
+            poems = [instance[1] for instance in instances] # All poems shape:batch_size,sens_num,sen_len
+            genre_patterns = [instance[2] for instance in instances] #shape:batch_size,sens_num,sen_len
+            for i in xrange(-1, self.__sens_num-1): #-1,0 ... sens_num-2  0,1,...,sens_num-1
                 if i <0:
-                    line0 = [[] for poem in poems]
+                    line0 = [[] for poem in poems] #batch_size,0
                 else:
-                    line0 = [poem[i] for poem in poems]
+                    line0 = [poem[i] for poem in poems] #batch_size,sen_len
                 
                 line1 = [poem[i+1] for poem in poems]
-                phs = [pattern[i+1] for pattern in genre_patterns]
+                phs = [pattern[i+1] for pattern in genre_patterns] #batch_size,sen_len
 
                 batch_enc_inps, batch_dec_inps, batch_weights, enc_mask, len_inps, \
                     ph_inps, batch_write_mask = self.get_batch_sentence(line0, line1, phs, batch_size)
@@ -169,7 +169,7 @@ class PoetryTool(object):
             data_dic['write_masks'] = all_write_mask
 
             # Build key batch
-            keysvec = [instance[0] for instance in instances]
+            keysvec = [instance[0] for instance in instances] #batch_size,keywords_num,keywords_len
             key_inps = [[] for x in xrange(self.__key_slots)]
             key_mask = []
             
@@ -177,7 +177,7 @@ class PoetryTool(object):
                 keys = keysvec[i] # Batch_size * at most 4
                 mask = [1.0]*len(keys) + [0.0]*(self.__key_slots-len(keys))
                 mask = np.reshape(mask, [self.__key_slots, 1])
-                key_mask.append(mask)
+                key_mask.append(mask) #key_mask batch_size [key_slots,1]
                 for step in xrange(0, len(keys)):
                     key = keys[step]
                     key_inps[step].append(key + [self.__PAD_ID] * (2-len(key)))
@@ -206,26 +206,26 @@ class PoetryTool(object):
         enc_mask, write_mask = [], []
 
         for i in xrange(batch_size):
-            enc_inp = inputs[i]
+            enc_inp = inputs[i] #长度为sen_len或0的list
             dec_inp = outputs[i] + [self.__EOS_ID]
-            ph = phs[i]
+            ph = phs[i] #长度为sen_len的list
 
             # Encoder inputs are padded
             enc_pad_size = self.__enc_len - len(enc_inp)
             enc_pad = [self.__PAD_ID] * enc_pad_size #如[0]*10
-            enc_inps.append(enc_inp + enc_pad)
+            enc_inps.append(enc_inp + enc_pad) #enc_inps batch_size,enc_len
             mask = [1.0] * (len(enc_inp)) + [0.0] * (enc_pad_size)
             mask = np.reshape(mask, [self.__enc_len, 1])
-            enc_mask.append(mask)
-            write_mask.append(mask)
+            enc_mask.append(mask) #batch_size [enc_len,1]
+            write_mask.append(mask) #batch_size [enc_len,1]
 
             # Decoder inputs get an extra "GO" symbol, and are padded then.
             dec_pad_size = self.__dec_len - len(dec_inp) - 1
-            dec_inps.append([self.__GO_ID] + dec_inp + [self.__PAD_ID] * dec_pad_size)
+            dec_inps.append([self.__GO_ID] + dec_inp + [self.__PAD_ID] * dec_pad_size) #dec_inps batch_size,dec_len
 
-            ph_inps.append(ph+[0]*(self.__dec_len-len(ph)))
+            ph_inps.append(ph+[0]*(self.__dec_len-len(ph))) #ph_inps batch_size,dec_len
             len_inp = range(len(dec_inp)+1, 0, -1) + [0]*(dec_pad_size) #range(start,stop,step)
-            len_inps.append(len_inp)
+            len_inps.append(len_inp) #batch_size,dec_len
 
         # Create batch-major vectors.
         batch_enc_inps, batch_dec_inps, batch_weights = [], [], []
