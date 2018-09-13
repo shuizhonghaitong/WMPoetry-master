@@ -40,7 +40,7 @@ class DataTool(object):
             newpas = []
             for pa in pas:
                 pa = pa.split(" ")
-                newpas.append([int(p) for p in pa])
+                newpas.append([int(p) for p in pa]) #4,5或4,7
             sen_lens_str = para[3].split(" ")
             sen_lens = [int(l) for l in sen_lens_str]
             # tune name; patterns; 36 ping yun, 37 ze yun; # of lines in each paragraph

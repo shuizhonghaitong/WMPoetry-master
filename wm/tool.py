@@ -305,7 +305,7 @@ class PoetryTool(object):
         return batch_enc_inps, enc_mask, len_inps
 
     
-    def gen_batch_key_beam(self, keys, batch_size):
+    def gen_batch_key_beam(self, keys, batch_size): #已知keywords，写出key_inps,key_mask，然后把key_inps变成batch_key_inps
         ''' Generate batch input for batch keywords '''
         keysvec = [keys for _ in xrange(0, batch_size)]
         key_inps = [[] for x in xrange(self.__key_slots)] #长度为key_slots的list，每个元素是长度为batch_size的list,每个元素是长度为2的list
@@ -323,10 +323,10 @@ class PoetryTool(object):
                 key_inps[len(keys)+step].append([self.__PAD_ID] * 2)
 
         # key_inputs: key_slots, [id1, id2], batch_size
-        batch_key_inps = [[] for x in xrange(self.__key_slots)]
+        batch_key_inps = [[] for x in xrange(self.__key_slots)] #key_slots,2 [batch_size]
         for step in xrange(0, self.__key_slots):
             batch_key_inps[step].append(np.array([key_inps[step][i][0] for i in xrange(batch_size)]))
             batch_key_inps[step].append(np.array([key_inps[step][i][1] for i in xrange(batch_size)]))
-        key_mask = np.array(key_mask)
+        key_mask = np.array(key_mask) #[batch_size,key_slots,1]
 
         return batch_key_inps, key_mask

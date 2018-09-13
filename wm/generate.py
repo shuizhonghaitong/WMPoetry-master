@@ -37,7 +37,7 @@ class GeneratorUI(object):
             pattern_id = input("please select genre pattern > ")
             yun = input("please input yun type> ")
             ori_pattern = self.dtool.getPattern(pattern_id)
-            pattern = ori_pattern[1]
+            pattern = ori_pattern[1] #4,5或4,7
             name = ori_pattern[0]
             pattern = self.__setYun2Pattern(pattern, yun)
             print ("select pattern: %s" % (name))

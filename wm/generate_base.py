@@ -78,11 +78,11 @@ class Generator(object):
 
     def __buildPH(self):
         self.__PHDic = self.dtool.buildPHDicForIdx(
-            copy.deepcopy(self.tool.get_vocab()))
+            copy.deepcopy(self.tool.get_vocab())) #把__GLDic改一下，由原来的 韵编号-字列表，变为，韵编号-字id列表
         
-    def addtionFilter(self, trans, pos):
+    def addtionFilter(self, trans, pos): #4 trans batch_size,3
         pos -= 1
-        preidx = range(0, pos)
+        preidx = range(0, pos) #0 1 2
         batch_size = len(trans)
         forbidden_list = [[] for _ in xrange(0, batch_size)]
 
@@ -92,7 +92,7 @@ class Generator(object):
 
         return forbidden_list
 
-    def beam_select(self, probs, trans, k, trg_len, beam_size, repeatidxvec, ph):
+    def beam_select(self, probs, trans, k, trg_len, beam_size, repeatidxvec, ph): #trans是已有的候选，probs是这次step的。trans [candidate_num,already_len] probs [candidate_num,vocab_size]
         V = np.shape(probs)[1]  # vocabulary size
         n_samples = np.shape(probs)[0]
         if k == 1:
@@ -116,8 +116,8 @@ class Generator(object):
             probs *= cost_eps
             probs[:, self.__PHDic[ph]] /= float(cost_eps)
 
-        flat_next_costs = probs.flatten()
-        best_costs_indices = np.argpartition(
+        flat_next_costs = probs.flatten() #全部展平，变为1维列表
+        best_costs_indices = np.argpartition( #若第一个参数是数字列表，第二个参数是k，则返回一个与数字列表相同长度的列表，这个列表里的每个元素是下标，其中下标是k的元素是从小到大排序的正确元素，它左边的元素是小于它的，右边的元素是大于它的
             flat_next_costs.flatten(), n_samples)[:n_samples]
 
         trans_indices = [int(idx)
@@ -299,7 +299,7 @@ class Generator(object):
         new_topic_trace = np.tile(new_topic_trace, [beam_size, 1])
         return new_topic_trace
 
-    def generate_one(self, keystr, pattern):
+    def generate_one(self, keystr, pattern): #pattern 4,5或4,7
         beam_size = self.beam_size
         sens_num = len(pattern)
         keys = keystr.strip()
@@ -308,7 +308,7 @@ class Generator(object):
         keys = keystr.split(" ")
         keys_idxes = [self.tool.chars2idxes(self.tool.line2chars(key)) for key in keys]
         #print (keys_idxes)
-        key_inps, key_mask = self.tool.gen_batch_key_beam(keys_idxes, beam_size)
+        key_inps, key_mask = self.tool.gen_batch_key_beam(keys_idxes, beam_size) #key_inps:key_slots,2 [batch_size] key_mask:batch_size [key_slots,1]
 
         # Calculate initial_key state and key_states
         key_initial_state, key_states = self.model.key_memory_computer(self.sess, key_inps, key_mask)
