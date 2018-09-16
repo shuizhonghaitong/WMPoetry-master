@@ -252,7 +252,7 @@ class Generator(object):
         for i in range(len(fin_align)):
             fin_align[i] = fin_align[i][1:, :]
 
-        index = np.argsort(fin_costs)
+        index = np.argsort(fin_costs) #从小到大排序，返回下标列表
         fin_align = np.array(fin_align)[index]
         fin_trans = np.array(fin_trans)[index]
         fin_costs = np.array(sorted(fin_costs))
@@ -267,36 +267,36 @@ class Generator(object):
 
     def get_new_global_trace(self, sess, history, ori_enc_states, beam_size):
 
-        enc_states = np.expand_dims(ori_enc_states, axis=0)
-        prev_history = np.expand_dims(history[0, :], 0)
+        enc_states = np.expand_dims(ori_enc_states, axis=0) #[1,enc_len,2*hidden_size]
+        prev_history = np.expand_dims(history[0, :], 0) #[1,global_trace_size]
         #print (np.shape(prev_encoder_state))
         #tt = input(">")
         new_history = self.model.global_trace_computer(sess, prev_history, enc_states)
-        new_history = np.tile(new_history, [beam_size, 1])
+        new_history = np.tile(new_history, [beam_size, 1]) #[beam_size,global_trace_size]
         return new_history
 
     def get_new_his_mem(self, sess, ori_his_mem, enc_states, ori_global_trace, beam_size, src_len):
-        his_mem = np.expand_dims(ori_his_mem, axis=0)
+        his_mem = np.expand_dims(ori_his_mem, axis=0) #[1,his_mem_slots,his_mem_size]
         fin_states = []
         for i in xrange(0, np.shape(enc_states)[0]):
-            fin_states.append(np.expand_dims(enc_states[i], 0))
+            fin_states.append(np.expand_dims(enc_states[i], 0)) #enc_len [1,2*hidden_size]
 
         mask = [np.ones((1, 1))] * src_len + [np.zeros((1, 1))] * (np.shape(enc_states)[0]-src_len)
-        global_trace = np.expand_dims(ori_global_trace[0, :], 0)
+        global_trace = np.expand_dims(ori_global_trace[0, :], 0) #[1,global_trace_size]
         new_his_mem = self.model.his_mem_computer(sess, his_mem, 
             fin_states, mask, global_trace)
 
-        new_his_mem = np.tile(new_his_mem, [beam_size, 1, 1])
+        new_his_mem = np.tile(new_his_mem, [beam_size, 1, 1]) #[beam_size,his_mem_slots,his_mem_size]
         return new_his_mem
 
     def get_new_topic_trace(self, sess, ori_topic_trace, key_align, ori_key_states, beam_size):
-        key_states = np.expand_dims(ori_key_states[0, :, :], 0)
-        topic_trace = np.expand_dims(ori_topic_trace, axis=0)
-        key_align = np.mean(key_align, axis=0) 
-        key_align = np.expand_dims(key_align, axis=0)
+        key_states = np.expand_dims(ori_key_states[0, :, :], 0) #[1,key_slots,2*hidden_size]
+        topic_trace = np.expand_dims(ori_topic_trace, axis=0) #[1,topic_trace_size+key_slots]
+        key_align = np.mean(key_align, axis=0) #[trg_len,key_slots]变为[key_slots]
+        key_align = np.expand_dims(key_align, axis=0) #[1,key_slots]
         new_topic_trace = self.model.topic_trace_computer(sess, 
             key_states, topic_trace, key_align)
-        new_topic_trace = np.tile(new_topic_trace, [beam_size, 1])
+        new_topic_trace = np.tile(new_topic_trace, [beam_size, 1]) #[beam_size,topic_trace_size+key_slots]
         return new_topic_trace
 
     def generate_one(self, keystr, pattern): #pattern 4,5或4,7
@@ -327,7 +327,7 @@ class Generator(object):
             if step > 0:
                 key_initial_state = None
             src_len = len(sen)
-            batch_sen, enc_mask, len_inps = self.tool.gen_batch_beam(sen, trg_len, beam_size)
+            batch_sen, enc_mask, len_inps = self.tool.gen_batch_beam(sen, trg_len, beam_size) #len_inps [dec_len,batch_size]
             trans, costs, align, enc_states = self.beam_search(self.sess, batch_sen, len_inps, key_states,
                 key_initial_state, topic_trace, his_mem, his_mem_mask, global_trace, enc_mask, key_mask,
                 repeatidxes, phs)
@@ -342,16 +342,16 @@ class Generator(object):
             his_mem = self.get_new_his_mem(self.sess, his_mem[which, :, :], 
                 enc_states[which], global_trace, beam_size, src_len)
 
-            if step >= 1:
-                one_his_mem = his_mem[which, :, :]
-                his_mem_mask = np.sum(np.abs(one_his_mem), axis=1)
+            if step >= 1: #更新his_mem_mask
+                one_his_mem = his_mem[which, :, :] #[his_mem_slots,his_mem_size]
+                his_mem_mask = np.sum(np.abs(one_his_mem), axis=1) #[his_mem_slots]
                 his_mem_mask = his_mem_mask != 0
-                his_mem_mask = np.tile(his_mem_mask.astype(np.float32), [beam_size, 1])
+                his_mem_mask = np.tile(his_mem_mask.astype(np.float32), [beam_size, 1]) #[beam_size,his_mem_slots]
 
             sentence = self.tool.beam_get_sentence(trans[which])
             sentence = sentence.strip()
             ans.append(sentence)
-            attn_aligns = align[which][0:trg_len, :]
+            attn_aligns = align[which][0:trg_len, :] #trg_len,key_slots
             topic_trace = self.get_new_topic_trace(self.sess, topic_trace[which, :], attn_aligns,
                 key_states, beam_size)
             global_trace = self.get_new_global_trace(self.sess, global_trace, enc_states[which], beam_size)
